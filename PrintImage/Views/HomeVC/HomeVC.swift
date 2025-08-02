@@ -14,27 +14,27 @@ class HomeVC: UIViewController {
     private let bottomBarView = UIView()
     private let collectionViewMain = UICollectionView(frame: .zero, collectionViewLayout: UICollectionViewFlowLayout())
     private var handler: HomeCollectionViewHandler!
-    
+    private var imagePickerHelper: ImagePickerHelper?
+    private let homeModel = HomeModel()
     
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .secondaryLabel
         
+        setupBindings()
         setupTopBar()
         setupMediaSelectBar()
         setupBottomBar()
         setupCollectionView()
-        
-        
         handler = HomeCollectionViewHandler(collectionView: collectionViewMain)
         
-        handler.items = ["1","1","1","1",]
+        handler.items = []
         handler.onItemSelected = { indexPath in
             print("Bạn chọn item tại \(indexPath.row)")
         }
         
         handler.onRetryTapped = {
-            print("Đã nhấn thử lại")
+            self.openPicker()
         }
         
     }
@@ -43,6 +43,15 @@ class HomeVC: UIViewController {
         super.viewWillAppear(animated)
         self.navigationController?.setNavigationBarHidden(true, animated: false)
     }
+    
+    private func setupBindings() {
+        homeModel.onImagesPicked = { [weak self] images in
+                guard let self = self else { return }
+                let vcEditImage = EditImageVC(images: images)
+                self.navigationController?.pushViewController(vcEditImage, animated: false)
+            }
+        }
+    
     
     private func setupTopBar() {
         topBarView.backgroundColor = .darkGray
@@ -72,6 +81,8 @@ class HomeVC: UIViewController {
         let trashButton = ButtonIcon.createIconButton(systemName: "trash.fill", badgeNumber: 2)
         let infoButton = ButtonIcon.createIconButton(systemName: "info.circle")
         
+        photoButton.addTarget(self, action: #selector(openImagePicker), for: .touchUpInside)
+        
         [photoButton, trashButton, infoButton].forEach { btn in
             btn.widthAnchor.constraint(equalToConstant: ResponsiveLayout.buttonSize()).isActive = true
             btn.heightAnchor.constraint(equalToConstant: ResponsiveLayout.buttonSize()).isActive = true
@@ -84,9 +95,6 @@ class HomeVC: UIViewController {
         view.addSubview(mediaSelectView)
         
         NSLayoutConstraint.activate([
-            
-            
-            
             mediaSelectView.topAnchor.constraint(equalTo: topBarView.bottomAnchor, constant: 2),
             mediaSelectView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             mediaSelectView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
@@ -95,18 +103,14 @@ class HomeVC: UIViewController {
     }
     
     private func setupCollectionView() {
-        
         let layout = UICollectionViewFlowLayout()
-        layout.scrollDirection = .horizontal
+        layout.scrollDirection = .vertical
         layout.minimumLineSpacing = 10
         layout.itemSize = CGSize(width: 100, height: 100)
         
         collectionViewMain.backgroundColor = .clear
         collectionViewMain.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(collectionViewMain)
-        
-        
-        
         
         NSLayoutConstraint.activate([
             collectionViewMain.topAnchor.constraint(equalTo: mediaSelectView.bottomAnchor, constant: 2),
@@ -129,8 +133,19 @@ class HomeVC: UIViewController {
         ])
     }
     
+    @objc func openImagePicker() {
+        openPicker()
+    }
     
-    
+    private func openPicker() {
+            imagePickerHelper = ImagePickerHelper(presentationController: self)
+            imagePickerHelper?.presentImagePicker { [weak self] images in
+                guard let self else {
+                    return
+                }
+                self.homeModel.handlePickedImages(images)
+            }
+        }
     
 }
 

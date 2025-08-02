@@ -24,7 +24,6 @@ final class HomeCollectionViewHandler: NSObject, UICollectionViewDataSource, UIC
     
     var onItemSelected: ((IndexPath) -> Void)?
     var onRetryTapped: (() -> Void)?
-    
     weak var collectionView: UICollectionView?
     
     // MARK: - Setup
