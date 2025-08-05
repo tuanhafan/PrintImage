@@ -9,9 +9,19 @@ import Foundation
 import UIKit
 class ZoomableImageView: UIView, UIScrollViewDelegate {
     
+    
+    private let gridView = UIView()
     private let scrollView = UIScrollView()
     private let imageView = UIImageView()
     private let containerView = UIView()
+    private var currentRotation: CGFloat = 0
+    private var currentImage = UIImage()
+    private var isGridVisible = false {
+        didSet {
+            gridView.isHidden = isGridVisible
+        }
+    }
+    
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupViews()
@@ -21,6 +31,13 @@ class ZoomableImageView: UIView, UIScrollViewDelegate {
         super.init(coder: coder)
         setupViews()
     }
+    
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        drawGridOverlay()
+    }
+    
+    // setup
     
     private func setupViews() {
         // self là wrapperView (khung trắng)
@@ -49,35 +66,72 @@ class ZoomableImageView: UIView, UIScrollViewDelegate {
         
         // Setup imageView
         
-        imageView.contentMode = .scaleAspectFit
+        imageView.contentMode = .scaleAspectFill
         imageView.translatesAutoresizingMaskIntoConstraints = true
+        containerView.backgroundColor = .clear
         scrollView.addSubview(containerView)
         containerView.addSubview(imageView)
+        
+        // grid view
+        
+        gridView.backgroundColor = .clear
+        gridView.isUserInteractionEnabled = false
+        gridView.isHidden = true
+        addSubview(gridView)
+        gridView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            gridView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            gridView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            gridView.topAnchor.constraint(equalTo: topAnchor),
+            gridView.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ])
+        drawGridOverlay()
     }
     
     
     
-    func setImage(_ image: UIImage) {
+    func setImage(_ image: UIImage,sizeImage: CGSize) {
         imageView.image = image
         
-        let imageScale: CGFloat = 0.1
-        let viewScale: CGFloat = 0.5
+        scrollView.setZoomScale(1.0, animated: false)
+        scrollView.contentInset = .zero
+        scrollView.contentOffset = .zero
+        imageView.transform = .identity
         
-        let imageSize = CGSize(width: image.size.width * imageScale,
-                               height: image.size.height * imageScale)
+        currentImage = image
+        let viewScale: CGFloat = 2
         
-        let containerSize = CGSize(width: image.size.width * viewScale ,
+        let containerSize = CGSize(width: image.size.width * viewScale,
                                    height: image.size.height * viewScale)
         
-        // Set frame containerView và imageView
+        // Set frame containerView
         containerView.frame = CGRect(origin: .zero, size: containerSize)
-        let offsetX = (containerSize.width - scrollView.bounds.width)/2
-        let offsetY = (containerSize.height - scrollView.bounds.height)/2
-        imageView.frame = CGRect(origin: CGPoint(x: offsetX, y: offsetY), size: imageSize)
-        // Set contentSize của scrollView đúng theo container
-       
+        
+        // Tính offset trước khi set frame mới cho imageView
+        let offsetX = (containerSize.width - scrollView.bounds.width) / 2
+        let offsetY = (containerSize.height - scrollView.bounds.height) / 2
+        
+        // Gán contentSize trước để scrollView không tự điều chỉnh lại offset
+        scrollView.contentSize = containerSize
+        
+        // Set lại frame cho imageView
+        imageView.frame = CGRect(origin: CGPoint(x: offsetX, y: offsetY), size: sizeImage)
+        
+        // Gán offset cuối cùng
         scrollView.setContentOffset(CGPoint(x: offsetX, y: offsetY), animated: false)
-        scrollView.contentSize = containerView.frame.size
+    }
+    
+    private func centerContainerView() {
+        let offsetX = max((scrollView.bounds.width - containerView.frame.width) / 2, 0)
+        let offsetY = max((scrollView.bounds.height - containerView.frame.height) / 2, 0)
+        containerView.center = CGPoint(x: scrollView.bounds.midX, y: scrollView.bounds.midY)
+        containerView.frame.origin = CGPoint(x: offsetX, y: offsetY)
+    }
+    
+    // Action
+    
+    func setGridVisible(_ visible: Bool) {
+        isGridVisible = visible
     }
     
     
@@ -86,6 +140,9 @@ class ZoomableImageView: UIView, UIScrollViewDelegate {
         return containerView
     }
     
+    func rotateImageView(by angle: CGFloat) {
+        containerView.transform = containerView.transform.rotated(by: angle)
+    }
     
     func scrollViewWillEndDragging(_ scrollView: UIScrollView, withVelocity velocity: CGPoint, targetContentOffset: UnsafeMutablePointer<CGPoint>) {
         targetContentOffset.pointee = scrollView.contentOffset
@@ -123,5 +180,45 @@ class ZoomableImageView: UIView, UIScrollViewDelegate {
         
         return UIImage(cgImage: cgImage, scale: scale, orientation: image.imageOrientation)
     }
+    
+    private func drawGridOverlay() {
+        let numberOfLines = 2 // chia 3 phần
+        let path = UIBezierPath()
+        let width = bounds.width
+        let height = bounds.height
+        
+        // Đường dọc
+        for i in 1...numberOfLines {
+            let x = CGFloat(i) * width / CGFloat(numberOfLines + 1)
+            path.move(to: CGPoint(x: x, y: 0))
+            path.addLine(to: CGPoint(x: x, y: height))
+        }
+        
+        // Đường ngang
+        for i in 1...numberOfLines {
+            let y = CGFloat(i) * height / CGFloat(numberOfLines + 1)
+            path.move(to: CGPoint(x: 0, y: y))
+            path.addLine(to: CGPoint(x: width, y: y))
+        }
+        
+        let shapeLayer = CAShapeLayer()
+        shapeLayer.path = path.cgPath
+        shapeLayer.strokeColor = UIColor.lightGray.withAlphaComponent(0.6).cgColor
+        shapeLayer.lineWidth = 1
+        shapeLayer.fillColor = nil
+        
+        gridView.layer.sublayers?.forEach { $0.removeFromSuperlayer() } // clear cũ
+        gridView.layer.addSublayer(shapeLayer)
+    }
+    
+    func rotateImageBy90Degrees() {
+        imageView.transform = imageView.transform.rotated(by: .pi / 2)
+    }
+    
+    
+    func rotateImageBy90Ingrees() {
+        imageView.transform = imageView.transform.rotated(by: -(.pi / 2))
+    }
+    
     
 }

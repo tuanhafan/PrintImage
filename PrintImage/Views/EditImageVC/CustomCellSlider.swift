@@ -23,6 +23,13 @@ class CustomCellSlider: UICollectionViewCell {
         return label
     }()
     
+    private let viewContainer : UIView = {
+        let view = UIView()
+        view.backgroundColor = .clear
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
     private let viewPaperSize : UIView = {
         let view = UIView()
         view.backgroundColor = .white
@@ -45,11 +52,16 @@ class CustomCellSlider: UICollectionViewCell {
         super.layoutSubviews()
         labelName.heightAnchor.constraint(equalTo: contentView.heightAnchor, multiplier: 0.25).isActive = true
         
-        
     }
+    override var isSelected: Bool {
+            didSet {
+                
+                labelName.backgroundColor = isSelected ? .white : .systemGray
+                labelName.textColor = isSelected ? .black : .white
+            }
+        }
     
-    
-    func configuaration(with  paperSize : PaperSize){
+    func configuaration(with  paperSize : PaperSize, sizeCurrentImage:(width : CGFloat, height:CGFloat)){
         labelName.text = paperSize.name
         
         
@@ -60,7 +72,9 @@ class CustomCellSlider: UICollectionViewCell {
         var heightMultiplier: CGFloat = 0.5
         
         switch paperSize.value {
-        case 1: widthMultiplier = 0.2
+        case 1:
+            widthMultiplier = (sizeCurrentImage.width * 0.0001)
+            heightMultiplier = (sizeCurrentImage.height * 0.0001)
         case 2: widthMultiplier = 0.3
         case 3: widthMultiplier = 0.35
         case 4: widthMultiplier = 0.45
@@ -85,16 +99,22 @@ class CustomCellSlider: UICollectionViewCell {
     
     private func setup(){
         self.backgroundColor = .darkGray
+        viewContainer.addSubview(viewPaperSize)
         contentView.addSubview(labelName)
-        contentView.addSubview(viewPaperSize)
+        contentView.addSubview(viewContainer)
         NSLayoutConstraint.activate([
             labelName.topAnchor.constraint(equalTo: contentView.topAnchor),
             labelName.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             labelName.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             
             
-            viewPaperSize.topAnchor.constraint(equalTo: labelName.bottomAnchor,constant: 10),
-            viewPaperSize.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            viewContainer.topAnchor.constraint(equalTo: labelName.bottomAnchor, constant: 0),
+            viewContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            viewContainer.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            viewContainer.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+            
+            viewPaperSize.centerXAnchor.constraint(equalTo: viewContainer.centerXAnchor),
+            viewPaperSize.centerYAnchor.constraint(equalTo: viewContainer.centerYAnchor),
         ])
         
     }

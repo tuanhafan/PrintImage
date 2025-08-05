@@ -18,17 +18,61 @@ class EditImageVC: UIViewController {
     private let viewRotate = UIView()
     private let imageFrame = ZoomableImageView()
     private let images: [UIImage]
-    private var currentImageEdit : UIImage = UIImage() {
+    private let labelSmaller = UILabel()
+    private let widthTf = UITextField()
+    private let heighttf = UITextField()
+    private let squareshapeBtn = ButtonIcon.createIconButton(systemName: "squareshape.split.3x3")
+    private let editImageModel = EditImageModel()
+    private var didLayoutOnce = false
+    private var arrSizeChoice : [Int] = [3,1,6]
+    private var typeTocChangeFrame : Int = 0
+    private var isSwarpImage : Bool = false
+    private var currentSize : (width:CGFloat,height:CGFloat) = (0,0) {
         didSet {
-            let width = currentImageEdit.size.width
-            let height = currentImageEdit.size.height
-            imageFrame.setImage(currentImageEdit)
-            imageFrame.heightAnchor.constraint(equalToConstant: height*0.1).isActive = true
-            imageFrame.widthAnchor.constraint(equalToConstant: width*0.1).isActive = true
+            widthTf.text = "\(currentSize.width)"
+            heighttf.text = "\(currentSize.height)"
+            
         }
     }
     
-   
+    private var currentTypeSize: Int = 2 {
+        didSet {
+            for (index, view) in typeSizeStv.arrangedSubviews.enumerated() {
+                guard let label = view as? UILabel else { continue }
+                if index  == currentTypeSize {
+                    label.backgroundColor = .white
+                    label.textColor = .black
+                } else {
+                    label.backgroundColor = .darkGray
+                    label.textColor = .white
+                }
+            }
+            
+            switch currentTypeSize {
+            case 0:
+                labelSmaller.text = "≤ 1000 mm"
+            case 1:
+                labelSmaller.text = "≤ 100 cm"
+            case 2:
+                labelSmaller.text = "≤ 40 inch"
+            default:
+                labelSmaller.text = "≤ 100 cm"
+            }
+        }
+    }
+    private var currentImageEdit : UIImage = UIImage() {
+        didSet {
+            
+        }
+    }
+    
+    private var isgridVisible: Bool = false {
+        didSet {
+            imageFrame.setGridVisible(!isgridVisible)
+            
+        }
+    }
+    
     
     init(images: [UIImage]) {
         self.images = images
@@ -52,11 +96,45 @@ class EditImageVC: UIViewController {
         setupBottomBar()
         imageAssignment()
         sliderhandler = CollectionViewSlider(collectionView: collectionViewSize)
+        sliderhandler.currentImage = (currentImageEdit.size.width , currentImageEdit.size.height)
+        sliderhandler.onSizeSelected = { [weak self] selectedValue in
+            self?.handleSelectedValue(selectedValue)
+        }
+        
+        DispatchQueue.main.async {
+            self.handleSelectCell(0)
+        }
+        
     }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         self.navigationController?.setNavigationBarHidden(true, animated: false)
+    }
+    
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        if !didLayoutOnce {
+                updateImageViewFrameIfNeeded()
+                didLayoutOnce = true
+            }
+        
+    }
+    private func updateImageViewFrameIfNeeded() {
+        
+        // Kiểm tra kích thước hợp lệ
+        guard contenViewImage.bounds.width > 0, contenViewImage.bounds.height > 0 else {
+            return
+        }
+        let width = currentImageEdit.size.width
+        let height = currentImageEdit.size.height
+        let newSize = editImageModel.changeSizehandler(with: 1, currentImage: (width,height), in: contenViewImage)
+        imageFrame.frame.size = newSize.size
+        imageFrame.center = CGPoint(x: contenViewImage.bounds.midX, y: contenViewImage.bounds.midY)
+        imageFrame.setImage(currentImageEdit,sizeImage: newSize.size)
+        currentSize = newSize.frameSize
+        currentTypeSize = newSize.typeSize
+        arrSizeChoice = [3,1,6]
     }
     
     private func addComponents() {
@@ -74,6 +152,21 @@ class EditImageVC: UIViewController {
             return
         }
         currentImageEdit = images[0]
+    }
+    
+    
+    private func handleSelectedValue(_ type: Int) {
+        let width = currentImageEdit.size.width
+        let height = currentImageEdit.size.height
+        let newSize = editImageModel.changeSizehandler(with: type, currentImage: (width,height), in: contenViewImage)
+        imageFrame.frame.size = newSize.size
+        imageFrame.center = CGPoint(x: contenViewImage.bounds.midX, y: contenViewImage.bounds.midY)
+        imageFrame.setImage(currentImageEdit,sizeImage: newSize.size)
+        currentSize = newSize.frameSize
+        currentTypeSize = newSize.typeSize
+        arrSizeChoice = editImageModel.createArraySize(type,oldArr: arrSizeChoice)
+        typeTocChangeFrame = type
+        isSwarpImage = false
     }
     
     private func setupTopBar() {
@@ -100,10 +193,9 @@ class EditImageVC: UIViewController {
         
         // Add buttons
         let paintpaletteBtn = ButtonIcon.createIconButton(systemName: "paintpalette.fill")
-        let squareshapeBtn = ButtonIcon.createIconButton(systemName: "squareshape.split.3x3")
-        squareshapeBtn.tintColor = .lightGray
         let sliderBntn = ButtonIcon.createIconButton(systemName: "slider.horizontal.3")
-        
+        squareshapeBtn.tintColor = .lightGray
+        squareshapeBtn.addTarget(self, action: #selector(showGrid), for: .touchUpInside)
         [paintpaletteBtn, squareshapeBtn, sliderBntn].forEach { btn in
             btn.widthAnchor.constraint(equalToConstant: ResponsiveLayout.buttonSize()).isActive = true
             btn.heightAnchor.constraint(equalToConstant: ResponsiveLayout.buttonSize()).isActive = true
@@ -113,7 +205,7 @@ class EditImageVC: UIViewController {
         
         mediaSelectView.backgroundColor = .darkGray
         mediaSelectView.translatesAutoresizingMaskIntoConstraints = false
-
+        
         NSLayoutConstraint.activate([
             mediaSelectView.topAnchor.constraint(equalTo: topBarView.bottomAnchor, constant: 2),
             mediaSelectView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
@@ -145,13 +237,19 @@ class EditImageVC: UIViewController {
         let mmLabel = UILabel()
         let cmLabel = UILabel()
         let inchLabel = UILabel()
-        
-        [mmLabel,cmLabel,inchLabel].forEach{
-            $0.font = UIFont.systemFont(ofSize: 14, weight: .medium)
-            $0.textColor = .white
-            $0.backgroundColor = .darkGray
-            $0.textAlignment = .center
-            $0.translatesAutoresizingMaskIntoConstraints = false
+        let labels = [mmLabel, cmLabel, inchLabel]
+        labels.enumerated().forEach { (index, label) in
+            label.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+            label.textColor = .white
+            label.backgroundColor = .darkGray
+            label.textAlignment = .center
+            label.translatesAutoresizingMaskIntoConstraints = false
+            
+            label.isUserInteractionEnabled = true
+            label.tag = index // Gán tag nếu muốn biết label nào được nhấn
+            
+            let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleLabelTap(_:)))
+            label.addGestureRecognizer(tapGesture)
         }
         
         mmLabel.text = "mm"
@@ -182,7 +280,6 @@ class EditImageVC: UIViewController {
         
         
         [mmLabel,cmLabel,inchLabel].forEach{
-            
             $0.topAnchor.constraint(equalTo: typeSizeStv.topAnchor, constant: 1).isActive = true
             $0.bottomAnchor.constraint(equalTo: typeSizeStv.bottomAnchor, constant: -1).isActive = true
         }
@@ -192,9 +289,7 @@ class EditImageVC: UIViewController {
         viewRotate.translatesAutoresizingMaskIntoConstraints = false
         viewRotate.backgroundColor = .darkGray
         
-        let topStv = UIStackView()
         let mainStv = UIStackView()
-        let labelSmaller = UILabel()
         let centerStv = UIStackView()
         let btnRotateLeft = ButtonIcon.createIconButton(systemName: "arrowshape.turn.up.left.fill")
         let btnRotateRight = ButtonIcon.createIconButton(systemName: "arrowshape.turn.up.right.fill")
@@ -202,8 +297,11 @@ class EditImageVC: UIViewController {
         let btnSwap = UIButton()
         let widthLabel = UILabel()
         let heightLabel = UILabel()
-        let widthTf = UITextField()
-        let heighttf = UITextField()
+        let widthView = UIView()
+        let heightView = UIView()
+        
+        btnRotateLeft.addTarget(self, action: #selector(rotateImageIngree), for: .touchUpInside)
+        btnRotateRight.addTarget(self, action: #selector(rotateImageDegree), for: .touchUpInside)
         
         
         widthTf.text = "3.5"
@@ -238,29 +336,32 @@ class EditImageVC: UIViewController {
         btnChangeTypeSize.tintColor = .white
         
         btnSwap.setImage(UIImage(systemName: "arrow.trianglehead.2.clockwise"), for: .normal)
-        btnSwap.setPreferredSymbolConfiguration(UIImage.SymbolConfiguration(pointSize: 24, weight: .bold), forImageIn: .normal)
+        btnSwap.setPreferredSymbolConfiguration(UIImage.SymbolConfiguration(pointSize: 18, weight: .bold), forImageIn: .normal)
         btnSwap.tintColor = .white
+        btnSwap.addTarget(self, action: #selector(swapWidthAndHeight), for: .touchUpInside)
         
-        centerStv.addArrangedSubview(widthTf)
-        centerStv.addArrangedSubview(btnChangeTypeSize)
-        centerStv.addArrangedSubview(heighttf)
+        [widthView,heightView].forEach{
+            $0.backgroundColor = .clear
+            //            $0.translatesAutoresizingMaskIntoConstraints = false
+        }
+        
+        widthView.addSubview(widthLabel)
+        widthView.addSubview(widthTf)
+        heightView.addSubview(heightLabel)
+        heightView.addSubview(heighttf)
+        
+        centerStv.addArrangedSubview(widthView)
+        centerStv.addArrangedSubview(btnSwap)
+        centerStv.addArrangedSubview(heightView)
         
         mainStv.addArrangedSubview(btnRotateLeft)
         mainStv.addArrangedSubview(centerStv)
         mainStv.addArrangedSubview(btnRotateRight)
         
-        topStv.addArrangedSubview(widthLabel)
-        topStv.addArrangedSubview(btnSwap)
-        topStv.addArrangedSubview(heightLabel)
         
         centerStv.axis = .horizontal
-        centerStv.spacing = 10
-        
-        topStv.axis = .horizontal
-        topStv.alignment = .bottom
-        topStv.spacing = 10
-        topStv.distribution = .equalSpacing
-        topStv.translatesAutoresizingMaskIntoConstraints = false
+        centerStv.spacing = 15
+        centerStv.alignment = .bottom
         
         mainStv.axis = .horizontal
         mainStv.distribution = .equalSpacing
@@ -268,7 +369,7 @@ class EditImageVC: UIViewController {
         mainStv.spacing = 8
         mainStv.translatesAutoresizingMaskIntoConstraints = false
         
-        labelSmaller.text = "≤ 40 ml"
+        labelSmaller.text = "≤ 100 cm"
         labelSmaller.textAlignment = .center
         labelSmaller.font = UIFont.systemFont(ofSize: 10, weight: .medium)
         labelSmaller.textColor = .white
@@ -282,18 +383,14 @@ class EditImageVC: UIViewController {
         ])
         
         viewRotate.superview?.layoutIfNeeded()
-        viewRotate.addSubview(topStv)
         viewRotate.addSubview(mainStv)
         viewRotate.addSubview(labelSmaller)
         
         NSLayoutConstraint.activate([
             
-            topStv.topAnchor.constraint(equalTo: viewRotate.topAnchor, constant: 3),
-            topStv.leadingAnchor.constraint(equalTo: viewRotate.leadingAnchor, constant: 100),
-            topStv.trailingAnchor.constraint(equalTo: viewRotate.trailingAnchor, constant: -100),
-            topStv.heightAnchor.constraint(equalTo: viewRotate.heightAnchor, multiplier: 0.35),
             
-            mainStv.topAnchor.constraint(equalTo: topStv.bottomAnchor, constant: 3),
+            
+            mainStv.topAnchor.constraint(equalTo: viewRotate.topAnchor, constant: 10),
             mainStv.leadingAnchor.constraint(equalTo: viewRotate.leadingAnchor, constant: 20),
             mainStv.trailingAnchor.constraint(equalTo: viewRotate.trailingAnchor, constant: -20),
             mainStv.bottomAnchor.constraint(equalTo: labelSmaller.topAnchor, constant: -1),
@@ -308,6 +405,27 @@ class EditImageVC: UIViewController {
             labelSmaller.leadingAnchor.constraint(equalTo: viewRotate.leadingAnchor),
             labelSmaller.bottomAnchor.constraint(equalTo: viewRotate.bottomAnchor,constant: -2),
             labelSmaller.heightAnchor.constraint(equalTo: viewRotate.heightAnchor, multiplier: 0.25),
+            
+            
+            widthLabel.topAnchor.constraint(equalTo: widthView.topAnchor, constant: 0),
+            widthLabel.leadingAnchor.constraint(equalTo: widthView.leadingAnchor, constant: 0),
+            widthLabel.trailingAnchor.constraint(equalTo: widthView.trailingAnchor, constant: 0),
+            
+            widthTf.topAnchor.constraint(equalTo: widthLabel.bottomAnchor, constant: 2),
+            widthTf.leadingAnchor.constraint(equalTo: widthView.leadingAnchor, constant: 0),
+            widthTf.trailingAnchor.constraint(equalTo: widthView.trailingAnchor, constant: 0),
+            widthTf.bottomAnchor.constraint(equalTo: widthView.bottomAnchor, constant: 0),
+            widthTf.heightAnchor.constraint(equalTo: widthView.heightAnchor, multiplier: 0.6),
+            
+            heightLabel.topAnchor.constraint(equalTo: heightView.topAnchor, constant: 0),
+            heightLabel.leadingAnchor.constraint(equalTo: heightView.leadingAnchor, constant: 0),
+            heightLabel.trailingAnchor.constraint(equalTo: heightView.trailingAnchor, constant: 0),
+            
+            heighttf.topAnchor.constraint(equalTo: heightLabel.bottomAnchor, constant: 2),
+            heighttf.leadingAnchor.constraint(equalTo: heightView.leadingAnchor, constant: 0),
+            heighttf.trailingAnchor.constraint(equalTo: heightView.trailingAnchor, constant: 0),
+            heighttf.bottomAnchor.constraint(equalTo: heightView.bottomAnchor, constant: 0),
+            heighttf.heightAnchor.constraint(equalTo: heightView.heightAnchor, multiplier: 0.6),
         ])
         
     }
@@ -315,18 +433,14 @@ class EditImageVC: UIViewController {
     private func setupContenViewImage() {
         contenViewImage.backgroundColor = .clear
         contenViewImage.translatesAutoresizingMaskIntoConstraints = false
-        imageFrame.translatesAutoresizingMaskIntoConstraints = false
         contenViewImage.addSubview(imageFrame)
-        	
+        
         
         NSLayoutConstraint.activate([
             contenViewImage.topAnchor.constraint(equalTo: viewRotate.bottomAnchor, constant: 2),
             contenViewImage.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 0),
             contenViewImage.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: 0),
             
-            imageFrame.centerXAnchor.constraint(equalTo: contenViewImage.centerXAnchor),
-            imageFrame.centerYAnchor.constraint(equalTo: contenViewImage.centerYAnchor),
-           
         ])
     }
     
@@ -334,14 +448,101 @@ class EditImageVC: UIViewController {
         bottomBarView.backgroundColor = .darkGray
         bottomBarView.translatesAutoresizingMaskIntoConstraints = false
         
+        let subStackView = UIStackView()
+        subStackView.axis = .horizontal
+        subStackView.distribution = .equalSpacing
+        subStackView.alignment = .center
+        subStackView.translatesAutoresizingMaskIntoConstraints = false
+        subStackView.isLayoutMarginsRelativeArrangement = true
+        subStackView.layoutMargins = UIEdgeInsets(top: 5, left: ResponsiveLayout.horizontalMargin(), bottom: 5, right: ResponsiveLayout.horizontalMargin())
+        
+        
+        let labelCount = UILabel()
+        labelCount.text = "1 / 2"
+        labelCount.textColor = .white
+        labelCount.font = UIFont.systemFont(ofSize: 18)
+        let closeBtn = ButtonIcon.createIconButton(systemName: "xmark")
+        let checkmarkBtn = ButtonIcon.createIconButton(systemName: "checkmark")
+        checkmarkBtn.tintColor = .systemBlue
+        
+        subStackView.addArrangedSubview(closeBtn)
+        subStackView.addArrangedSubview(labelCount)
+        subStackView.addArrangedSubview(checkmarkBtn)
+        
+        bottomBarView.addSubview(subStackView)
+        
+        
         NSLayoutConstraint.activate([
             bottomBarView.topAnchor.constraint(equalTo: contenViewImage.bottomAnchor, constant: 0),
             bottomBarView.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: 0),
             bottomBarView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             bottomBarView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            bottomBarView.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.06)
+            bottomBarView.heightAnchor.constraint(equalTo: view.heightAnchor, multiplier: 0.08),
+            
+            subStackView.topAnchor.constraint(equalTo: bottomBarView.topAnchor, constant: 5),
+            subStackView.leadingAnchor.constraint(equalTo: bottomBarView.leadingAnchor),
+            subStackView.trailingAnchor.constraint(equalTo: bottomBarView.trailingAnchor),
         ])
     }
     
+    @objc func showGrid(){
+        isgridVisible = !isgridVisible
+        squareshapeBtn.tintColor = isgridVisible ? .white : .lightGray
+    }
     
+    @objc func rotateImageDegree() {
+        imageFrame.rotateImageBy90Degrees()
+    }
+    
+    @objc func rotateImageIngree() {
+        imageFrame.rotateImageBy90Ingrees()
+    }
+    
+    @objc func handleLabelTap(_ gesture: UITapGestureRecognizer) {
+        guard let tappedLabel = gesture.view as? UILabel else { return }
+        currentTypeSize = tappedLabel.tag
+       
+        switch tappedLabel.tag {
+        case 0:
+            handleSelectedValue(arrSizeChoice[0])
+            handleSelectCell(arrSizeChoice[0]-1)
+        case 1:
+            handleSelectedValue(arrSizeChoice[1])
+            handleSelectCell(arrSizeChoice[1]-1)
+        case 2:
+            handleSelectedValue(arrSizeChoice[2])
+            handleSelectCell(arrSizeChoice[2]-1)
+        default:
+            break
+        }
+    }
+    
+    func handleSelectCell(_ index:Int) {
+        let indexPath = IndexPath(item: index, section: 0)
+        self.collectionViewSize.selectItem(at: indexPath, animated: false, scrollPosition: [])
+        self.collectionViewSize.delegate?.collectionView?(self.collectionViewSize, didSelectItemAt: indexPath)
+    }
+    
+    @objc func swapWidthAndHeight(){
+        isSwarpImage = !isSwarpImage
+        let width = currentSize.height
+        let height = currentSize.width
+        currentSize = (width,height)
+        
+        let widthFrame = currentImageEdit.size.width
+        let heightFame = currentImageEdit.size.height
+        
+        if(isSwarpImage){
+            let newSize = editImageModel.changeSizehandlerSwap(with: typeTocChangeFrame, currentImage: (widthFrame,heightFame), in: contenViewImage)
+            imageFrame.frame.size = newSize
+            imageFrame.center = CGPoint(x: contenViewImage.bounds.midX, y: contenViewImage.bounds.midY)
+            imageFrame.setImage(currentImageEdit,sizeImage: newSize)
+        }else {
+            let newSize = editImageModel.changeSizehandler(with: typeTocChangeFrame, currentImage: (widthFrame,heightFame), in: contenViewImage)
+            imageFrame.frame.size = newSize.size
+            imageFrame.center = CGPoint(x: contenViewImage.bounds.midX, y: contenViewImage.bounds.midY)
+            imageFrame.setImage(currentImageEdit,sizeImage: newSize.size)
+        }
+        
+    }
 }

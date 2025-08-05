@@ -5,7 +5,13 @@
 //  Created by Alex Tran on 2/8/25.
 //
 
-import Foundation
+import UIKit
+
 struct ImageEdited {
-    var width: Int
+    var width: CGFloat
+    var height:CGFloat
+    var imageOrigin: UIImage
+    var imageEdit : UIImage
+    var typeSize : Int
+    var typePaper : Int
 }

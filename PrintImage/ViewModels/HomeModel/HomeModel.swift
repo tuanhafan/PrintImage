@@ -12,7 +12,7 @@ class HomeModel{
     var onImagesPicked: (([UIImage]) -> Void)?
     
     func handlePickedImages(_ images: [UIImage]) {
-       
         onImagesPicked?(images)
     }
+    
 }

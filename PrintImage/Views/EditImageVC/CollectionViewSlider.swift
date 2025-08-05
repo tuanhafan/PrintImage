@@ -12,6 +12,8 @@ class CollectionViewSlider: NSObject, UICollectionViewDataSource, UICollectionVi
 
     private let editImageModel = EditImageModel()
     private var paperSizes : [PaperSize] = []
+    var currentImage: (width: CGFloat, height: CGFloat) = (0,0)
+    var onSizeSelected: ((Int) -> Void)?
     
     weak var collectionView: UICollectionView?
        init(collectionView: UICollectionView) {
@@ -38,7 +40,7 @@ class CollectionViewSlider: NSObject, UICollectionViewDataSource, UICollectionVi
            guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: CustomCellSlider.identifier, for: indexPath) as? CustomCellSlider else {
                return UICollectionViewCell()
            }
-           cell.configuaration(with: paperSize)
+           cell.configuaration(with: paperSize,sizeCurrentImage:currentImage)
            return cell
        }
 
@@ -57,4 +59,8 @@ class CollectionViewSlider: NSObject, UICollectionViewDataSource, UICollectionVi
         return CGSize(width: itemWidth, height: itemHeight)
     }
 
+    //
+    func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
+        onSizeSelected?(indexPath.row + 1)
+    }
 }
