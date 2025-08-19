@@ -11,7 +11,8 @@ struct ImageEdited {
     var width: CGFloat
     var height:CGFloat
     var imageOrigin: UIImage
-    var imageEdit : UIImage
+    var imageEdited : UIImage
     var typeSize : Int
     var typePaper : Int
+    var backgroundColor : String = "#ffffff"
 }
